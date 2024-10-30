@@ -29,42 +29,42 @@ class EasyHTTP:
             print(f"Error: {e}")
             return False
 
-    def isConnected(self) -> bool:
+    def isConnectedToWiFi(self) -> bool:
         return self.wlan.isconnected()
 
     def get(self, url, headers=None) -> Response:
-        if not self.isConnected() and not self.connectToWiFi():
+        if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
         return requests.get(url=url, headers=headers)
 
     def post(self, url, data, headers=None) -> Response:
-        if not self.isConnected() and not self.connectToWiFi():
+        if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
         if isinstance(data, (str, bytes)):
             return requests.post(url, headers=headers, data=data)
         return requests.post(url, headers=headers, data=ujson.dumps(data))
 
     def put(self, url, data, headers=None) -> Response:
-        if not self.isConnected() and not self.connectToWiFi():
+        if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
         if isinstance(data, (str, bytes)):
             return requests.put(url, headers=headers, data=data)
         return requests.put(url, headers=headers, data=ujson.dumps(data))
 
     def delete(self, url, headers=None) -> Response:
-        if not self.isConnected() and not self.connectToWiFi():
+        if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
         return requests.delete(url, headers=headers)
-    
+
     def head(self, url, data, headers=None) -> Response:
-        if not self.isConnected() and not self.connectToWiFi():
+        if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
         if isinstance(data, (str, bytes)):
             return requests.head(url, headers=headers, data=data)
         return requests.head(url, headers=headers, data=ujson.dumps(data))
-    
+
     def patch(self, url, data, headers=None) -> Response:
-        if not self.isConnected() and not self.connectToWiFi():
+        if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
         if isinstance(data, (str, bytes)):
             return requests.patch(url, headers=headers, data=data)
