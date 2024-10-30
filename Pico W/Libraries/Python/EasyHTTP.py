@@ -40,7 +40,6 @@ class EasyHTTP:
     def post(self, url, data, headers=None) -> Response:
         if not self.isConnected() and not self.connectToWiFi():
             return None
-        # if data is a string or dict, send it as is
         if isinstance(data, (str, bytes)):
             return requests.post(url, headers=headers, data=data)
         return requests.post(url, headers=headers, data=ujson.dumps(data))
