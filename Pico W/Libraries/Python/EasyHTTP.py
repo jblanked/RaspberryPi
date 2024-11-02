@@ -29,6 +29,10 @@ class EasyHTTP:
             print(f"Error: {e}")
             return False
 
+    def disconnectFromWiFi(self):
+        if self.isConnectedToWiFi():
+            self.wlan.disconnect()
+
     def isConnectedToWiFi(self) -> bool:
         return self.wlan.isconnected()
 
