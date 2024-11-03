@@ -104,15 +104,12 @@ class EasyServer:
             print("Failed to start server:", e)
             return False
 
-    def add_route(self, path, handler, html, method="GET"):
+    def add_route(self, path, handler, method="GET"):
         """
-        Register a new route with its handler and HTML content.
+        Register a new route with its handler.
 
         :param path: URL path (e.g., "/custom")
-        :param handler: Function to handle the route
-                       For GET requests, it can be a function without parameters.
-                       For POST requests, it should accept one parameter for the data.
-        :param html: HTML content to serve when this route is accessed (for GET)
+        :param handler: Function to handle the route. It should return the HTML response as a string.
         :param method: HTTP method (e.g., "GET", "POST")
         """
         normalized_path = path.rstrip("/") if path != "/" else path
@@ -123,7 +120,6 @@ class EasyServer:
 
         self.routes[normalized_path][method] = {
             "handler": handler,
-            "html": html,
         }
 
     def accept_points(self):
@@ -220,14 +216,20 @@ class EasyServer:
                                 # Execute the handler for GET (no data)
                                 if handler:
                                     try:
-                                        handler()
+                                        response_content = handler()
                                     except Exception as handler_e:
                                         print(
                                             f"Handler error for path '{path}': {handler_e}"
                                         )
+                                        response_content = "<h1>500 Internal Server Error</h1><p>Handler execution failed.</p>"
+                                        status_line = "500 Internal Server Error\r\n"
+                                else:
+                                    response_content = "<h1>500 Internal Server Error</h1><p>No handler defined.</p>"
+                                    status_line = "500 Internal Server Error\r\n"
 
-                                response_content = route_info["html"]
-                                status_line = "200 OK\r\n"
+                                if not status_line:
+                                    status_line = "200 OK\r\n"
+
                             elif method == "POST":
                                 # Extract the body data for POST
                                 try:
@@ -246,15 +248,19 @@ class EasyServer:
                                 # Execute the handler with the POST data
                                 if handler:
                                     try:
-                                        handler(body)
+                                        response_content = handler(body)
                                     except Exception as handler_e:
                                         print(
                                             f"Handler error for path '{path}': {handler_e}"
                                         )
+                                        response_content = "<h1>500 Internal Server Error</h1><p>Handler execution failed.</p>"
+                                        status_line = "500 Internal Server Error\r\n"
+                                else:
+                                    response_content = "<h1>500 Internal Server Error</h1><p>No handler defined.</p>"
+                                    status_line = "500 Internal Server Error\r\n"
 
-                                # Respond with a simple acknowledgment or custom response
-                                response_content = "Success"
-                                status_line = "200 OK\r\n"
+                                if not status_line:
+                                    status_line = "200 OK\r\n"
                             else:
                                 # Method not supported
                                 status_line = "405 Method Not Allowed\r\n"
@@ -309,140 +315,3 @@ class EasyServer:
             except Exception as e:
                 print(f"Unexpected error: {e}")
                 continue
-
-
-'''
-# Example handler methods
-def custom_message():
-    print("Custom GET handler invoked.")
-    # Perform actions for GET request
-
-
-def custom_post_handler(data):
-    print("Custom POST handler invoked with data:", data)
-    # Perform actions with POST data
-
-
-def another_handler():
-    print("Another GET handler was called.")
-    # Perform actions for GET request
-
-
-def another_post_handler(data):
-    print("Another POST handler invoked with data:", data)
-    # Perform actions with POST data
-
-
-def popup_handler(data=None):
-    print("Popup handler invoked.")
-    # Handle both GET and POST if needed
-
-
-# Usage Example
-if __name__ == "__main__":
-    # Initialize the server with your WiFi credentials and mode
-    # For Station mode:
-    server = EasyServer("your_ssid", "your_pass", mode=network.STA_IF)
-
-    # For Access Point mode:
-    #server = EasyServer(
-    #    "fake-access-point-name", "fake-access-point-pass", mode=network.AP_IF
-    #)
-
-    # Start the server
-    if not server.start(port=80):
-        print("Failed to start the server. Exiting.")
-        exit()
-
-    # Register GET route with custom HTML
-    custom_html = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <title>Custom Page</title>
-        </head>
-        <body>
-            <h2>This is a custom page!</h2>
-            <p>You have accessed a custom GET route.</p>
-        </body>
-        </html>
-    """
-    server.add_route("/custom", custom_message, custom_html, method="GET")
-
-    # Register POST route on the same path with different handler
-    custom_post_html = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <title>Custom POST Page</title>
-        </head>
-        <body>
-            <h2>POST Request Received</h2>
-            <p>Your POST data has been processed.</p>
-        </body>
-        </html>
-    """
-    server.add_route("/custom", custom_post_handler, custom_post_html, method="POST")
-
-    # Register another GET route
-    another_html = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <title>Another Page</title>
-        </head>
-        <body>
-            <h2>Welcome to Another Page!</h2>
-            <p>This is another custom GET route.</p>
-        </body>
-        </html>
-    """
-    server.add_route("/another", another_handler, another_html, method="GET")
-
-    # Register another POST route
-    another_post_html = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <title>Another POST Page</title>
-        </head>
-        <body>
-            <h2>Another POST Request Received</h2>
-            <p>Your POST data has been processed for another route.</p>
-        </body>
-        </html>
-    """
-    server.add_route("/another", another_post_handler, another_post_html, method="POST")
-
-    # Register popup route for GET
-    popup_html = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <title>Popup Page</title>
-            <script type="text/javascript">
-                function openPopup() {
-                    window.open("https://www.example.com", "PopupWindow", "width=600,height=400");
-                }
-
-                window.onload = function() {
-                    openPopup();
-                };
-            </script>
-        </head>
-        <body>
-            <h1>Welcome to the Popup Page</h1>
-            <p>A popup window should have opened. If it didn't, please allow popups for this site.</p>
-        </body>
-        </html>
-    """
-    server.add_route("/popup", popup_handler, popup_html, method="GET")
-
-    # Run the server
-    server.run()
-'''
