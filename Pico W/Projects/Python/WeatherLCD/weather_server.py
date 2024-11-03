@@ -1,10 +1,12 @@
+"""
+Companion script for the WeatherLCD project.
+Use this script to create a simple web server that allows you to submit weather data and view it on a dashboard.
+Use the weather_lcd.py script to display the weather data on an LCD screen and submit the data to the server.
+"""
+
 import json
 import network
-import socket
-import time
-from EasyServer import (
-    EasyServer,
-)  # https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/Python/EasyServer.py
+from EasyServer import EasyServer
 
 
 def write_to_file(data, filename) -> bool:
@@ -61,7 +63,11 @@ def handle_get_weather():
     """
     Handler for GET /weather.
     Fetches weather data and returns the HTML dashboard.
+    Also logs the access.
     """
+    # Log the GET /weather access
+    handle_logs("GET /weather accessed.")
+
     filename = "weather.json"
     data = read_from_file(filename)
     weather_entries = data.get("weather", [])
@@ -183,22 +189,39 @@ def handle_post_weather(data, max_values: int = 50):
     """
     Handler for POST /weather.
     Receives weather data and stores it.
+    Also logs the POST action.
 
-    :param data: Raw POST data (URL-encoded).
+    :param data: Parsed POST data (dict for JSON, dict for URL-encoded).
+    :param max_values: Maximum number of weather entries to store.
     :return: HTML response string.
     """
     filename = "weather.json"
+
+    # Log the POST /weather action
+    log_message = f"POST /weather: {data}"
+    handle_logs(log_message)
+
     try:
-        # Parse URL-encoded data
-        parsed_data = {}
-        for pair in data.split("&"):
-            if "=" in pair:
-                key, value = pair.split("=", 1)
-                parsed_data[key] = value.replace("+", " ")  # Replace '+' with space
+        # Determine the type of `data` and extract parameters accordingly
+        if isinstance(data, dict):
+            # Data is parsed JSON
+            temperature = data.get("temperature")
+            time_entry = data.get("time")
+        elif isinstance(data, str):
+            # Data is URL-encoded string; parse it into a dictionary
+            parsed_data = {}
+            for pair in data.split("&"):
+                if "=" in pair:
+                    key, value = pair.split("=", 1)
+                    parsed_data[key] = value.replace("+", " ")
+            temperature = parsed_data.get("temperature")
+            time_entry = parsed_data.get("time")
+        else:
+            # Unsupported data type
+            print(f"Unsupported data type: {type(data)}")
+            return "<h1>400 Bad Request</h1><p>Unsupported data format.</p>"
 
-        temperature = parsed_data.get("temperature")
-        time_entry = parsed_data.get("time")
-
+        # Validate received data
         if temperature is None or time_entry is None:
             print("Invalid POST data: Missing temperature or time.")
             return "<h1>400 Bad Request</h1><p>Missing temperature or time.</p>"
@@ -228,19 +251,18 @@ def handle_post_weather(data, max_values: int = 50):
         }
         weather_array.append(new_entry)
 
-        # Ensure only the most recent 50 entries are kept
+        # Ensure only the most recent `max_values` entries are kept
         if len(weather_array) > max_values:
             # Remove the oldest entries (from the beginning of the list)
-            # This keeps the last 50 entries
             weather_array = weather_array[-max_values:]
-            print(f"Trimmed weather list to the most recent {max_values} entries.")
 
         # Update the existing data
         existing_data["weather"] = weather_array
 
         # Write back to file
         if write_to_file(existing_data, filename):
-            # Redirect back to GET /weather with a success message
+
+            # Return success HTML with redirect
             success_html = """
                 <!DOCTYPE html>
                 <html lang="en">
@@ -278,13 +300,19 @@ def handle_post_weather(data, max_values: int = 50):
 
     except Exception as e:
         print(f"Error handling POST data: {e}")
+        # Log the error
+        handle_logs(f"Error handling POST /weather: {e}")
         return f"<h1>500 Internal Server Error</h1><p>{e}</p>"
 
 
 def redirect_to_weather():
     """
     Handler to redirect root ("/") to /weather.
+    Also logs the redirection.
     """
+    # Log the redirection
+    handle_logs("GET / accessed. Redirecting to /weather.")
+
     redirect_html = """
         <!DOCTYPE html>
         <html lang="en">
@@ -300,7 +328,150 @@ def redirect_to_weather():
     return redirect_html
 
 
-"""
+def handle_logs(last_log_message=None) -> str:
+    """
+    Handler to show logs.
+    If `last_log_message` is provided, it adds it to the logs.
+    Accessing /logs does not add a log entry.
+
+    :param last_log_message: Optional log message to add.
+    :return: HTML string displaying the logs.
+    """
+    filename = "logs.txt"
+    content = ""
+
+    # Add new log message if provided, limiting to the last 100 entries
+    if last_log_message:
+        try:
+            # Read existing logs
+            try:
+                with open(filename, "r") as f:
+                    existing_logs = f.read().splitlines()
+            except OSError as e:
+                if (
+                    len(e.args) > 0 and e.args[0] == 2
+                ):  # ENOENT: No such file or directory
+                    existing_logs = []
+                else:
+                    print(e)
+                    existing_logs = []
+
+            # append the new message and limit to 100 entries
+            logs = [last_log_message] + existing_logs
+            # keep only the last 100 entries
+            logs = logs[:100]
+
+            # Write back to file
+            with open(filename, "w") as f:
+                f.write("\n".join(logs))
+
+            content = "\n".join(logs)
+        except Exception as e:
+            print(f"Error updating logs: {e}")
+            content = ""
+
+    else:
+        # Read existing logs from file
+        try:
+            with open(filename, "r") as f:
+                content = f.read()
+        except OSError as e:
+            # File does not exist; create it
+            if len(e.args) > 0 and e.args[0] == 2:  # ENOENT
+                with open(filename, "w") as f:
+                    f.write("")
+                content = ""
+            else:
+                print(e)
+                return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <title>Logs</title>
+                </head>
+                <body>
+                    <h1>Logs</h1>
+                    <p>Error reading logs.</p>
+                </body>
+                </html>
+                """
+        except Exception as e:
+            print(e)
+            return """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <title>Logs</title>
+            </head>
+            <body>
+                <h1>Logs</h1>
+                <p>No logs available.</p>
+            </body>
+            </html>
+            """
+
+    # Create log entries as table rows
+    log_entries = "\n".join(
+        f"<tr><td>{entry}</td></tr>" for entry in content.splitlines()
+    )
+
+    # Generate the HTML, injecting the pre-built table rows
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Logs</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                background-color: #f4f6f9;
+                color: #333;
+                padding: 20px;
+                margin: 0;
+            }}
+            h1 {{
+                text-align: center;
+                color: #444;
+            }}
+            .log-table {{
+                width: 100%;
+                max-width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+                background-color: #fff;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            }}
+            .log-table th, .log-table td {{
+                padding: 12px;
+                border: 1px solid #ddd;
+                text-align: left;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }}
+            .log-table th {{
+                background-color: #007bff;
+                color: white;
+            }}
+            .log-table tr:nth-child(even) {{
+                background-color: #f2f2f2;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>Logs</h1>
+        <table class="log-table">
+            <tr>
+                <th>Log Entry</th>
+            </tr>
+            {log_entries if log_entries else "<tr><td>No logs available.</td></tr>"}
+        </table>
+    </body>
+    </html>
+    """
+
+
 # Usage Example
 if __name__ == "__main__":
     # Initialize the server with your WiFi credentials and mode
@@ -321,6 +492,9 @@ if __name__ == "__main__":
     # Register root ("/") route to redirect to /weather
     server.add_route("/", redirect_to_weather, method="GET")
 
+    # Register GET route for /logs without logging the access
+    server.add_route("/logs", handle_logs, method="GET")
+
     # Run the server
     try:
         server.run()
@@ -331,4 +505,4 @@ if __name__ == "__main__":
         server.close()
     except Exception as e:
         print(e)
-"""
+        server.close()
