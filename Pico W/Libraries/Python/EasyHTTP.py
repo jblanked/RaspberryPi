@@ -1,6 +1,6 @@
 import network
 import urequests_2 as requests
-import json
+import ujson as json
 import time
 
 
@@ -44,47 +44,61 @@ class EasyHTTP:
         else:
             return requests.get(url=url)
 
-    def post(self, url, data, headers=None) -> Response:
+    def post(self, url, payload, headers=None) -> Response:
         if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
-        if data is None:
+        if payload is None:
             return None
-        if isinstance(data, (str, bytes)):
+        if isinstance(payload, (str, bytes)):
             if headers:
-                return requests.post(url, headers=headers, data=data)
-            return requests.post(url, data=data)
+                return requests.post(url, headers=headers, data=payload)
+            return requests.post(url, data=payload)
         if headers:
-            return requests.post(url, headers=headers, data=json.dumps(data))
-        return requests.post(url, data=json.dumps(data))
+            return requests.post(url, headers=headers, data=json.dumps(payload))
+        return requests.post(url, json_data=json.dumps(payload))
 
-    def put(self, url, data, headers=None) -> Response:
+    def put(self, url, payload, headers=None) -> Response:
         if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
-        if data is None:
+        if payload is None:
             return None
-        if isinstance(data, (str, bytes)):
-            return requests.put(url, headers=headers, data=data)
-        return requests.put(url, headers=headers, data=json.dumps(data))
+        if isinstance(payload, (str, bytes)):
+            if headers:
+                return requests.put(url, headers=headers, data=payload)
+            return requests.put(url, data=payload)
+        if headers:
+            return requests.put(url, headers=headers, json_data=json.dumps(payload))
+        return requests.put(url, json_data=json.dumps(payload))
 
     def delete(self, url, headers=None) -> Response:
         if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
-        return requests.delete(url, headers=headers)
+        if headers:
+            return requests.delete(url, headers=headers)
+        return requests.delete(url)
 
-    def head(self, url, data, headers=None) -> Response:
+    def head(self, url, payload, headers=None) -> Response:
         if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
-        if data is None:
+        if payload is None:
             return None
-        if isinstance(data, (str, bytes)):
-            return requests.head(url, headers=headers, data=data)
-        return requests.head(url, headers=headers, data=json.dumps(data))
+        if isinstance(payload, (str, bytes)):
+            if headers:
+                return requests.head(url, headers=headers, data=payload)
+            return requests.head(url, data=payload)
+        if headers:
+            return requests.head(url, headers=headers, json_data=json.dumps(payload))
+        return requests.head(url, json_data=json.dumps(payload))
 
-    def patch(self, url, data, headers=None) -> Response:
+    def patch(self, url, payload, headers=None) -> Response:
         if not self.isConnectedToWiFi() and not self.connectToWiFi():
             return None
-        if data is None:
+        if payload is None:
             return None
-        if isinstance(data, (str, bytes)):
-            return requests.patch(url, headers=headers, data=data)
-        return requests.patch(url, headers=headers, data=json.dumps(data))
+        if isinstance(payload, (str, bytes)):
+            if headers:
+                return requests.patch(url, headers=headers, data=payload)
+            return requests.patch(url, data=payload)
+        if headers:
+            return requests.patch(url, headers=headers, json_data=json.dumps(payload))
+        return requests.patch(url, json_data=json.dumps(payload))
