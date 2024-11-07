@@ -6,6 +6,8 @@ from EasyLCD import (
 )  # from https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/Python/EasyLCD.py
 from machine import Pin
 from time import sleep, ticks_ms
+import json
+import gc
 
 
 class WeatherLCD:
@@ -49,13 +51,24 @@ class WeatherLCD:
             if len(self.weather) <= 7:
                 self.lcd.write(f"Temp: {self.weather}", True, 0, 0)
                 self.lcd.write(f"Time: {self.last_time}", False, 0, 1)
+                temperature = self.weather.split()[0]
+                data = {"temperature": temperature, "time": self.last_time}
+                headers = {
+                    "User-Agent": "micropython-urequests/1.1",
+                    "Content-Type": "application/json",
+                }
+                try:
+                    res = self.http.post(
+                        url="http://10.0.0.25/weather", payload=data, headers=headers
+                    )
+                except Exception as e:
+                    print(f"Failed to send request: {e}")
             else:
                 self.lcd.write("Failed: ", True, 0, 0)
-                self.lcd.write(self.weather, False, 0, 1)
+                self.lcd.write(str(self.weather), False, 0, 1)
 
     def get_weather(self) -> str:
         self.led.on()
-
         # get lat and long
         ip_info = self.http.get("https://ipwhois.app/json/")
 
@@ -95,6 +108,7 @@ class WeatherLCD:
             return "Request Failed 2"
 
         weather_data = total_weather.json()
+
         returned_weather = weather_data["current"]["temperature_2m"]
 
         if returned_weather is None:
@@ -129,9 +143,19 @@ try:
     weather = WeatherLCD("your_ssid", "your_pass")
     weather.start()
     while True:
-        weather.run()
+        gc.collect()  # refresh memory
+        try:
+            weather.run()
+        except Exception as e:
+            weather.lcd.write("Error occured", True, 0, 0)
+            weather.lcd.write(str(e), False, 0, 1)
+            print(f"Error occured: {e}")
+            weather.led.off()
+            weather.http.disconnectFromWiFi()
+            break
 except Exception as e:
     weather.lcd.write("Error occured", True, 0, 0)
-    weather.lcd.write(e, False, 0, 1)
+    print(f"Error occured: {e}")
+    weather.lcd.write(str(e), False, 0, 1)
     weather.led.off()
-    weather.http.disconnectFromWifi()
+    weather.http.disconnectFromWiFi()
