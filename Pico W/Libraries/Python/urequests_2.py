@@ -8,6 +8,8 @@ import usocket
 import ujson
 import ssl
 
+RESPONSE_IS_BUSY = False
+
 
 class Response:
     def __init__(self, body):
@@ -30,9 +32,13 @@ class Response:
         return self._json
 
 
-def read_chunked(s):
+def read_chunked(s, uart=None, method="GET"):
+    global RESPONSE_IS_BUSY  # so we can modify the global variable
+    if uart:
+        uart.write(f"[{method}/SUCCESS] {method} request successful.\n")
     body = b""
     while True:
+        RESPONSE_IS_BUSY = True
         # Read the chunk size line
         line = s.readline()
         if not line:
@@ -52,9 +58,18 @@ def read_chunked(s):
             break
         # Read the chunk data
         chunk = s.read(chunk_size)
-        body += chunk
+        if uart:
+            uart.write(chunk)
+            uart.flush()
+        else:
+            body += chunk
         # Read the trailing CRLF after the chunk
         s.read(2)
+    if uart:
+        uart.flush()
+        uart.write("\n")
+        uart.write(f"[{method}/END]")
+    RESPONSE_IS_BUSY = False
     return body
 
 
@@ -68,7 +83,9 @@ def request(
     auth=None,
     timeout=None,
     parse_headers=True,
+    uart=None,
 ):
+    global RESPONSE_IS_BUSY  # so we can modify the global variable
     redirect = None  # redirection url, None means no redirection
     chunked_data = (
         data and getattr(data, "__next__", None) and not getattr(data, "__len__", None)
@@ -187,12 +204,43 @@ def request(
 
         # Read body
         if transfer_encoding == "chunked":
-            body = read_chunked(s)
+            body = read_chunked(s, uart, method)
         elif content_length is not None:
-            body = s.read(content_length)
+            if not uart:
+                body = s.read(content_length)
+            else:
+                # Read and write in fixed-size chunks
+                uart.write(f"[{method}/SUCCESS] {method} request successful.\n")
+                while content_length > 0:
+                    RESPONSE_IS_BUSY = True
+                    chunk_size = min(2048, content_length)
+                    chunk = s.read(chunk_size)
+                    if not chunk:
+                        break
+                    uart.write(chunk)
+                    uart.flush()
+                    content_length -= len(chunk)
+                uart.flush()
+                uart.write("\n")
+                uart.write(f"[{method}/END]")
+                RESPONSE_IS_BUSY = False
         else:
             # Read until the socket is closed
-            body = s.read()
+            if not uart:
+                body = s.read()
+            else:
+                uart.write(f"[{method}/SUCCESS] {method} request successful.\n")
+                while True:
+                    RESPONSE_IS_BUSY = True
+                    chunk = s.read(2048)
+                    if not chunk:
+                        break
+                    uart.write(chunk)
+                    uart.flush()
+                uart.flush()
+                uart.write("\n")
+                uart.write(f"[{method}/END]")
+                RESPONSE_IS_BUSY = False
 
         if redirect:
             s.close()
