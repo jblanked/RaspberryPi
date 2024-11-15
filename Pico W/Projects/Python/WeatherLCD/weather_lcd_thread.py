@@ -106,7 +106,7 @@ class WeatherLCD:
                     return False
 
                 self.weather = new_weather
-
+                self.update_time()
                 self.weather_interval = ticks_ms() + (60000 * 1)  # 1 minute
 
                 # Write to LCD
