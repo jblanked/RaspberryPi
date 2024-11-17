@@ -8,14 +8,16 @@ import errno
 class EasySD:
     def __init__(
         self,
-        miso_pin: int = 12,
-        cs_pin: int = 13,
-        sck_pin: int = 14,
-        mosi_pin: int = 15,
+        miso_gpio: int = 12,  # GPIO 12
+        cs_gpio: int = 13,  # GPIO 13
+        sck_gpio: int = 14,  # GPIO 14
+        mosi_gpio: int = 15,  # GPIO 15
     ):
         try:
-            self.spi = SPI(1, sck=Pin(sck_pin), mosi=Pin(mosi_pin), miso=Pin(miso_pin))
-            self.cs = Pin(cs_pin)
+            self.spi = SPI(
+                1, sck=Pin(sck_gpio), mosi=Pin(mosi_gpio), miso=Pin(miso_gpio)
+            )
+            self.cs = Pin(cs_gpio)
             self.sd = sdcard.SDCard(self.spi, self.cs)
             self.mounted = False
         except Exception as e:
