@@ -60,6 +60,15 @@ class EasySD:
             print(f"General Error during unmounting: {e}")
             return False
 
+    # return context manager
+    def with_open(self, file_path: str, mode: str) -> object:
+        """Open a file using a context manager."""
+        try:
+            return open(f"/sd/{file_path}", mode)
+        except Exception as e:
+            print(f"Error occurred while opening file: {e}")
+            return None
+
     def write(self, file_path: str, data: str) -> bool:
         """Write data to a file. If the file does not exist, it will be created."""
         try:
