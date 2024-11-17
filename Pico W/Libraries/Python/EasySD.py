@@ -1,6 +1,6 @@
 # Description: A simple library to make working with SD cards easier on the Raspberry Pi Pico W with MicroPython.
 from machine import SPI, Pin
-import sdcard, uos
+import uos
 import sys
 import errno
 
@@ -18,7 +18,7 @@ class EasySD:
                 1, sck=Pin(sck_gpio), mosi=Pin(mosi_gpio), miso=Pin(miso_gpio)
             )
             self.cs = Pin(cs_gpio)
-            self.sd = sdcard.SDCard(self.spi, self.cs)
+            self.sd = SDCard(self.spi, self.cs)
             self.mounted = False
         except Exception as e:
             print(f"Failed to initialize SPI or SD card: {e}")
