@@ -3,6 +3,7 @@
 from EasySD import EasySD
 from machine import SPI, Pin, I2S
 import os
+import gc
 
 
 class INMP441:
@@ -34,7 +35,6 @@ class INMP441:
 
         # Audio Configuration
         self.wav_file = None
-        self.RECORD_TIME_IN_SECONDS = 10
         self.WAV_SAMPLE_SIZE_IN_BITS = 16
         self.FORMAT = I2S.MONO
         self.SAMPLE_RATE_IN_HZ = 22_050
@@ -64,22 +64,22 @@ class INMP441:
         header += (datasize).to_bytes(4, "little")
         return header
 
-    def init_audio(self, file_name="mic_test.wav"):
+    def init_audio(self, file_name="inmp441.wav", duration: int = 10):
         num_channels = 1 if self.FORMAT == I2S.MONO else 2
         self.WAV_SAMPLE_SIZE_IN_BYTES = self.WAV_SAMPLE_SIZE_IN_BITS // 8
         self.RECORDING_SIZE_IN_BYTES = (
-            self.RECORD_TIME_IN_SECONDS
+            duration
             * self.SAMPLE_RATE_IN_HZ
             * self.WAV_SAMPLE_SIZE_IN_BYTES
             * num_channels
         )
 
-        self.wav_file = open(f"/sd/{file_name}", "wb")
+        self.wav_file = self.sd.with_open(file_name, "wb")
         wav_header = self._create_wav_header(
             self.SAMPLE_RATE_IN_HZ,
             self.WAV_SAMPLE_SIZE_IN_BITS,
             num_channels,
-            self.SAMPLE_RATE_IN_HZ * self.RECORD_TIME_IN_SECONDS,
+            self.SAMPLE_RATE_IN_HZ * duration,
         )
         self.wav_file.write(wav_header)
 
@@ -95,8 +95,8 @@ class INMP441:
             ibuf=self.BUFFER_LENGTH_IN_BYTES,
         )
 
-    def record(self, file_name="mic_test.wav"):
-        self.init_audio(file_name)
+    def record(self, file_name="inmp441.wav", duration: int = 10, unmount: bool = True):
+        self.init_audio(file_name,duration)
         if not self.audio_in:
             raise RuntimeError("Audio input not initialized. Call init_audio() first.")
 
@@ -120,12 +120,24 @@ class INMP441:
         except (KeyboardInterrupt, Exception) as e:
             print("Caught exception: {} {}".format(type(e).__name__, e))
         finally:
-            self._cleanup()
+            self._cleanup(unmount)
 
-    def _cleanup(self):
+    def _cleanup(self, unmount: bool = True):
         if self.wav_file:
             self.wav_file.close()
         if self.audio_in:
             self.audio_in.deinit()
-        self.sd.unmount()
-        self.spi.deinit()
+        if unmount:
+            self.sd.unmount()
+            self.spi.deinit()
+        
+    def read_wav_file(self, file_name):
+        try:            
+            wav_file = self.sd.with_open(file_name, "rb")
+            wav_file.seek(44)  # Skip WAV header
+            audio_data = wav_file.read()
+            return audio_data
+        except OSError as e:
+            print(f"Error reading file: {e}")
+            return None
+
