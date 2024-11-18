@@ -22,7 +22,24 @@ class EasySD:
             self.mounted = False
         except Exception as e:
             print(f"Failed to initialize SPI or SD card: {e}")
-            sys.exit()
+            return None
+
+    def os_error(self, err: OSError):
+        """Return a human-readable error message based on the OSError code."""
+        if err.errno == errno.ENOENT:
+            return "File or directory not found."
+        elif err.errno == errno.EACCES:
+            return "Permission denied."
+        elif err.errno == errno.ECONNREFUSED:
+            return "Connection refused."
+        elif err.errno == errno.EPERM:
+            return "Operation not permitted."
+        elif err.errno == errno.EIO:
+            return "I/O Error: Possible SD card disconnection or corruption."
+        elif err.errno == errno.ENODEV:
+            return "No SD card detected."
+        else:
+            return str(err)
 
     def mount(self, mount_point: str = "/sd"):
         """Mount the SD card to the specified mount point. Default is /sd."""
@@ -31,18 +48,8 @@ class EasySD:
             self.mounted = True
             return True
         except OSError as e:
-            if e.errno == errno.EIO:
-                print("I/O Error: Possible SD card disconnection or corruption.")
-                return False
-            elif e.errno == errno.ENODEV:
-                print("No SD card detected.")
-                return False
-            elif e.errno == errno.ENOENT:
-                print("Mount point not found.")
-                return False
-            else:
-                print(f"OS Error: {e}")
-                return False
+            print(f"Error during mounting: {self.os_error(e)}")
+            return False
         except Exception as e:
             print(f"General Error: {e}")
             return False
@@ -54,7 +61,7 @@ class EasySD:
             self.mounted = False
             return True
         except OSError as e:
-            print(f"Error during unmounting: {e}")
+            print(f"Error during unmounting: {self.os_error(e)}")
             return False
         except Exception as e:
             print(f"General Error during unmounting: {e}")
@@ -65,6 +72,9 @@ class EasySD:
         """Open a file using a context manager."""
         try:
             return open(f"/sd/{file_path}", mode)
+        except OSError as e:
+            print(f"Error occurred while opening file: {self.os_error(e)}")
+            return None
         except Exception as e:
             print(f"Error occurred while opening file: {e}")
             return None
@@ -75,6 +85,9 @@ class EasySD:
             with open(f"/sd/{file_path}", "w") as f:
                 f.write(data)
                 return True
+        except OSError as e:
+            print(f"Error occurred while writing: {self.os_error(e)}")
+            return False
         except Exception as e:
             print(f"Error occurred while writing: {e}")
             return False
@@ -84,6 +97,9 @@ class EasySD:
         try:
             with open(f"/sd/{file_path}", "r") as f:
                 return f.read()
+        except OSError as e:
+            print(f"Error occurred while reading: {self.os_error(e)}")
+            return
         except Exception as e:
             print(f"Error occurred while reading: {e}")
             return ""
@@ -92,6 +108,9 @@ class EasySD:
         """List all files in a directory. Default is /sd."""
         try:
             return uos.listdir(directory)
+        except OSError as e:
+            print(f"Error occurred while listing files: {self.os_error(e)}")
+            return []
         except Exception as e:
             print(f"Error occurred while listing files: {e}")
             return []
@@ -101,6 +120,9 @@ class EasySD:
         try:
             uos.mkdir(f"/sd/{directory}")
             return True
+        except OSError as e:
+            print(f"Error occurred while making directory: {self.os_error(e)}")
+            return False
         except Exception as e:
             print(f"Error occurred while making directory: {e}")
             return False
@@ -115,6 +137,9 @@ class EasySD:
                 return False
             uos.remove(f"/sd/{file_path}")
             return True
+        except OSError as e:
+            print(f"Error occurred while removing file: {self.os_error(e)}")
+            return False
         except Exception as e:
             print(f"Error occurred while removing file: {e}")
             return False
@@ -124,6 +149,9 @@ class EasySD:
         try:
             uos.rmdir(f"/sd/{directory}")
             return True
+        except OSError as e:
+            print(f"Error occurred while removing directory: {self.os_error(e)}")
+            return False
         except Exception as e:
             print(f"Error occurred while removing directory: {e}")
             return False
@@ -133,6 +161,9 @@ class EasySD:
         try:
             uos.rename(f"/sd/{old_file_path}", f"/sd/{new_file_path}")
             return True
+        except OSError as e:
+            print(f"Error occurred while renaming: {self.os_error(e)}")
+            return False
         except Exception as e:
             print(f"Error occurred while renaming: {e}")
             return False
@@ -141,6 +172,9 @@ class EasySD:
         """Get file stats."""
         try:
             return uos.stat(f"/sd/{file_path}")
+        except OSError as e:
+            print(f"Error occurred while getting file stats: {self.os_error(e)}")
+            return {}
         except Exception as e:
             print(f"Error occurred while getting file stats: {e}")
             return {}
