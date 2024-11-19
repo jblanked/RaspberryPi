@@ -1,7 +1,6 @@
 # Description: A simple library to make working with SD cards easier on the Raspberry Pi Pico W with MicroPython.
 from machine import SPI, Pin
 import uos
-import sys
 import errno
 
 
@@ -12,53 +11,51 @@ class EasySD:
         cs_gpio: int = 13,  # GPIO 13
         sck_gpio: int = 14,  # GPIO 14
         mosi_gpio: int = 15,  # GPIO 15
+        auto_mount: bool = False,
     ):
         try:
             self.spi = SPI(
                 1, sck=Pin(sck_gpio), mosi=Pin(mosi_gpio), miso=Pin(miso_gpio)
             )
-            self.cs = Pin(cs_gpio)
+            self.cs = Pin(cs_gpio, Pin.OUT)
             self.sd = SDCard(self.spi, self.cs)
-            self.mounted = False
+            self.auto_mount = auto_mount
+            self.is_mounted = self.mount() if auto_mount else False
         except Exception as e:
             print(f"Failed to initialize SPI or SD card: {e}")
+            self.is_mounted = False
             return None
 
-    def os_error(self, err: OSError):
+    def os_error(self, err: OSError) -> str:
         """Return a human-readable error message based on the OSError code."""
-        if err.errno == errno.ENOENT:
-            return "File or directory not found."
-        elif err.errno == errno.EACCES:
-            return "Permission denied."
-        elif err.errno == errno.ECONNREFUSED:
-            return "Connection refused."
-        elif err.errno == errno.EPERM:
-            return "Operation not permitted."
-        elif err.errno == errno.EIO:
-            return "I/O Error: Possible SD card disconnection or corruption."
-        elif err.errno == errno.ENODEV:
-            return "No SD card detected."
-        else:
-            return str(err)
+        error_messages = {
+            errno.ENOENT: "File or directory not found.",
+            errno.EACCES: "Permission denied.",
+            errno.ECONNREFUSED: "Connection refused.",
+            errno.EPERM: "Operation not permitted.",
+            errno.EIO: "I/O Error: Possible SD card disconnection or corruption.",
+            errno.ENODEV: "No SD card detected.",
+        }
+        return error_messages.get(err.errno, str(err))
 
-    def mount(self, mount_point: str = "/sd"):
+    def mount(self, mount_point: str = "/sd") -> bool:
         """Mount the SD card to the specified mount point. Default is /sd."""
         try:
             uos.mount(self.sd, mount_point)
-            self.mounted = True
+            self.is_mounted = True
             return True
         except OSError as e:
             print(f"Error during mounting: {self.os_error(e)}")
             return False
         except Exception as e:
-            print(f"General Error: {e}")
+            print(f"General Error during mounting: {e}")
             return False
 
-    def unmount(self, mount_point: str = "/sd"):
+    def unmount(self, mount_point: str = "/sd") -> bool:
         """Unmount the SD card from the specified mount point. Default is /sd."""
         try:
             uos.umount(mount_point)
-            self.mounted = False
+            self.is_mounted = False
             return True
         except OSError as e:
             print(f"Error during unmounting: {self.os_error(e)}")
@@ -67,68 +64,95 @@ class EasySD:
             print(f"General Error during unmounting: {e}")
             return False
 
-    # return context manager
-    def with_open(self, file_path: str, mode: str) -> object:
+    def with_open(self, file_path: str, mode: str):
         """Open a file using a context manager."""
+        if not self.is_mounted and self.auto_mount:
+            if not self.mount():
+                return None
         try:
             return open(f"/sd/{file_path}", mode)
         except OSError as e:
             print(f"Error occurred while opening file: {self.os_error(e)}")
-            return None
         except Exception as e:
             print(f"Error occurred while opening file: {e}")
-            return None
+        return None
 
     def write(self, file_path: str, data: str) -> bool:
         """Write data to a file. If the file does not exist, it will be created."""
+        if not self.is_mounted and self.auto_mount:
+            if not self.mount():
+                return False
         try:
             with open(f"/sd/{file_path}", "w") as f:
                 f.write(data)
-                return True
+            if self.auto_mount:
+                self.unmount()
+            return True
         except OSError as e:
             print(f"Error occurred while writing: {self.os_error(e)}")
-            return False
         except Exception as e:
             print(f"Error occurred while writing: {e}")
-            return False
+        if self.auto_mount:
+            self.unmount()
+        return False
 
     def read(self, file_path: str) -> str:
         """Read data from a file."""
+        returned_data = ""
+        if not self.is_mounted and self.auto_mount:
+            if not self.mount():
+                return returned_data
         try:
             with open(f"/sd/{file_path}", "r") as f:
-                return f.read()
+                returned_data = f.read()
         except OSError as e:
             print(f"Error occurred while reading: {self.os_error(e)}")
-            return
         except Exception as e:
             print(f"Error occurred while reading: {e}")
-            return ""
+        finally:
+            if self.auto_mount:
+                self.unmount()
+        return returned_data
 
     def listdir(self, directory: str = "/sd") -> list:
         """List all files in a directory. Default is /sd."""
+        files = []
+        if not self.is_mounted and self.auto_mount:
+            if not self.mount():
+                return files
         try:
-            return uos.listdir(directory)
+            files = uos.listdir(directory)
+            if self.auto_mount:
+                self.unmount()
         except OSError as e:
             print(f"Error occurred while listing files: {self.os_error(e)}")
-            return []
         except Exception as e:
             print(f"Error occurred while listing files: {e}")
-            return []
+        return files
 
     def mkdir(self, directory: str) -> bool:
         """Create a directory."""
+        if not self.is_mounted and self.auto_mount:
+            if not self.mount():
+                return False
         try:
             uos.mkdir(f"/sd/{directory}")
+            if self.auto_mount:
+                self.unmount()
             return True
         except OSError as e:
             print(f"Error occurred while making directory: {self.os_error(e)}")
-            return False
         except Exception as e:
             print(f"Error occurred while making directory: {e}")
-            return False
+        if self.auto_mount:
+            self.unmount()
+        return False
 
     def remove(self, file_path: str) -> bool:
         """Remove a file."""
+        if not self.is_mounted and self.auto_mount:
+            if not self.mount():
+                return False
         try:
             # Check if it's a file or directory
             stats = uos.stat(f"/sd/{file_path}")
@@ -136,52 +160,69 @@ class EasySD:
                 print("Error: Path is a directory, use rmdir() instead.")
                 return False
             uos.remove(f"/sd/{file_path}")
+            if self.auto_mount:
+                self.unmount()
             return True
         except OSError as e:
             print(f"Error occurred while removing file: {self.os_error(e)}")
-            return False
         except Exception as e:
             print(f"Error occurred while removing file: {e}")
-            return False
+        if self.auto_mount:
+            self.unmount()
+        return False
 
     def rmdir(self, directory: str) -> bool:
         """Remove a directory."""
+        is_removed = False
+        if not self.is_mounted and self.auto_mount:
+            if not self.mount():
+                return is_removed
         try:
             uos.rmdir(f"/sd/{directory}")
-            return True
+            is_removed = True
         except OSError as e:
             print(f"Error occurred while removing directory: {self.os_error(e)}")
-            return False
         except Exception as e:
             print(f"Error occurred while removing directory: {e}")
-            return False
+        finally:
+            if self.auto_mount:
+                self.unmount()
+        return is_removed
 
     def rename(self, old_file_path: str, new_file_path: str) -> bool:
         """Rename a file or directory."""
+        is_renamed = False
+        if not self.is_mounted and self.auto_mount:
+            if not self.mount():
+                return is_renamed
         try:
             uos.rename(f"/sd/{old_file_path}", f"/sd/{new_file_path}")
-            return True
+            is_renamed = True
         except OSError as e:
             print(f"Error occurred while renaming: {self.os_error(e)}")
-            return False
         except Exception as e:
             print(f"Error occurred while renaming: {e}")
-            return False
+        finally:
+            if self.auto_mount:
+                self.unmount()
+        return is_renamed
 
-    def stat(self, file_path: str) -> dict:
+    def stat(self, file_path: str):
         """Get file stats."""
+        stats = ()
+        if not self.is_mounted and self.auto_mount:
+            if not self.mount():
+                return stats
         try:
-            return uos.stat(f"/sd/{file_path}")
+            stats = uos.stat(f"/sd/{file_path}")
         except OSError as e:
             print(f"Error occurred while getting file stats: {self.os_error(e)}")
-            return {}
         except Exception as e:
             print(f"Error occurred while getting file stats: {e}")
-            return {}
-
-    def is_mounted(self) -> bool:
-        """Check if the SD card is mounted."""
-        return self.mounted
+        finally:
+            if self.auto_mount:
+                self.unmount()
+        return stats
 
 
 """
