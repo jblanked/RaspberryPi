@@ -21,10 +21,16 @@ class INMP441:
             mosi=Pin(mosi_gpio),
             miso=Pin(miso_gpio),
         )
-        self.sd = EasySD(miso_gpio, cs_gpio, sck_gpio, mosi_gpio)
-        self.sd.sd.init_spi(25_000_000)
-        if not self.sd.mount():
-            raise RuntimeError("Failed to mount SD card")
+        self.sd = None
+        try:
+            self.sd = EasySD(miso_gpio, cs_gpio, sck_gpio, mosi_gpio)
+            if self.sd is not None and self.sd.sd:
+                self.sd.sd.init_spi(25_000_000)
+                if not self.sd.mount():
+                    raise RuntimeError("Failed to mount SD card")
+        except Exception as e:
+            print(e)
+            return None
 
         # I2S Configuration
         self.SCK_PIN = 16
@@ -96,6 +102,8 @@ class INMP441:
         )
 
     def record(self, file_name="inmp441.wav", duration: int = 10, unmount: bool = True):
+        if not self.sd:
+            raise RuntimeError("SD not initialized..")
         self.init_audio(file_name,duration)
         if not self.audio_in:
             raise RuntimeError("Audio input not initialized. Call init_audio() first.")
@@ -140,4 +148,5 @@ class INMP441:
         except OSError as e:
             print(f"Error reading file: {e}")
             return None
+
 
