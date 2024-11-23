@@ -16,6 +16,7 @@ class EasySD:
         self.sd = None
         self.cs = None
         self.is_mounted = False
+        self.auto_mount = False
         try:
             self.spi = SPI(
                 1, sck=Pin(sck_gpio), mosi=Pin(mosi_gpio), miso=Pin(miso_gpio)
@@ -502,4 +503,5 @@ class SDCard:
     def ioctl(self, op, arg):
         if op == 4:  # get number of blocks
             return self.sectors
+
 
