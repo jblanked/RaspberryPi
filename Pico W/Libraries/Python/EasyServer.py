@@ -1,8 +1,9 @@
+from machine import Pin
 import network
 import socket
 import time
 import json
-import errno  # Added for error handling
+import errno
 
 
 class EasyServer:
@@ -12,6 +13,7 @@ class EasyServer:
         password,
         mode=network.STA_IF,
         append_question_mark=True,
+        use_led=False,
     ):
         """
         Initialize the EasyServer.
@@ -32,6 +34,7 @@ class EasyServer:
         self.append_question_mark = append_question_mark
         self.client = None
         self.last_response = None
+        self.led = Pin("LED", Pin.OUT) if use_led else None  # LED on the Pico W
 
     def close(self, reason=None):
         if reason:
@@ -55,6 +58,9 @@ class EasyServer:
         if not self.ssid or not self.password:
             print("Neither the SSID nor the Password can be empty")
             return False
+
+        if self.led:
+            self.led.on()
         try:
             self.wlan.active(True)
             if not self.wlan.isconnected():
@@ -65,9 +71,13 @@ class EasyServer:
                     time.sleep(1)
             self.local_ip = self.wlan.ifconfig()[0]
             print(f"\nConnected to {self.ssid} successfully.")
+            if self.led:
+                self.led.off()
             return True
         except Exception as e:
             print("Error:", e)
+            if self.led:
+                self.led.off()
             return False
 
     def setupAccessPoint(self):
@@ -77,15 +87,20 @@ class EasyServer:
         if self.mode != network.AP_IF:
             print("setupAccessPoint is only available in Access Point mode.")
             return False
-
+        if self.led:
+            self.led.on()
         try:
             self.wlan.config(ssid=self.ssid, password=self.password)
             self.wlan.active(True)
             self.local_ip = self.wlan.ifconfig()[0]
             print(f"Access Point '{self.ssid}' started.")
+            if not self.led:
+                self.led.off()
             return True
         except Exception as e:
             print("Failed to set up Access Point:", e)
+            if not self.led:
+                self.led.off()
             return False
 
     def disconnectFromWiFi(self):
@@ -114,6 +129,22 @@ class EasyServer:
             self.server.bind(address)
             self.server.listen(5)  # Increased backlog for multiple connections
             print(f"Server started at http://{self.local_ip}")
+            if self.led:
+                self.led.off()
+                time.sleep(0.5)
+                #
+                self.led.on()
+                time.sleep(0.5)
+                self.led.off()
+                time.sleep(0.5)
+                self.led.on()
+                time.sleep(0.5)
+                self.led.off()
+                time.sleep(0.5)
+                self.led.on()
+                time.sleep(0.5)
+                self.led.off()
+                time.sleep(0.5)
             return True
         except Exception as e:
             print("Failed to start server:", e)
@@ -194,7 +225,8 @@ class EasyServer:
                 self.client, addr = self.server.accept()
                 buffer = b""  # Initialize an empty buffer for the incoming data
                 keep_alive = False  # Disable keep-alive
-
+                if self.led:
+                    self.led.off()
                 while True:
                     try:
                         data = self.client.recv(1024)
@@ -202,7 +234,8 @@ class EasyServer:
                             print(f"Client {addr} disconnected.")
                             break
                         buffer += data
-
+                        if self.led:
+                            self.led.on()
                         # Check if we've received all headers
                         header_end = buffer.find(b"\r\n\r\n")
                         if header_end == -1:
@@ -223,6 +256,8 @@ class EasyServer:
                             print(
                                 f"Malformed request line from {addr}. Connection closed."
                             )
+                            if self.led:
+                                self.led.off()
                             break
 
                         headers = {}
@@ -360,6 +395,8 @@ class EasyServer:
 
                         # Remove the processed request from the buffer
                         buffer = buffer[header_end + 4 + content_length :]
+                        if self.led:
+                            self.led.off()
                         break  # Close connection after response
 
                     except OSError as e:
@@ -367,10 +404,17 @@ class EasyServer:
                             print(f"Connection with {addr} timed out.")
                         else:
                             print(f"OS error: {e}")
+                        if self.led:
+                            self.led.off()
                         break
                     except Exception as e:
                         print(f"Unexpected error: {e}")
+                        if self.led:
+                            self.led.off()
                         break
+                    finally:
+                        if self.led:
+                            self.led.off()
 
                 # Close the client connection
                 self.client.close()
@@ -384,3 +428,6 @@ class EasyServer:
             except Exception as e:
                 print(f"Unexpected error: {e}")
                 continue
+            finally:
+                if self.led:
+                    self.led.off()
