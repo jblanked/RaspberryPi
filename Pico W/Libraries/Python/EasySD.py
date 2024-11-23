@@ -13,21 +13,13 @@ class EasySD:
         mosi_gpio: int = 15,  # GPIO 15
         auto_mount: bool = False,
     ):
-        self.sd = None
-        self.cs = None
-        self.is_mounted = False
-        self.auto_mount = False
-        try:
-            self.spi = SPI(
-                1, sck=Pin(sck_gpio), mosi=Pin(mosi_gpio), miso=Pin(miso_gpio)
-            )
-            self.cs = Pin(cs_gpio, Pin.OUT)
-            self.sd = SDCard(self.spi, self.cs)
-            self.auto_mount = auto_mount
-            self.is_mounted = self.mount() if auto_mount else False
-        except Exception as e:
-            print(f"Failed to initialize SPI or SD card: {e}")
-            return None
+        self.spi = SPI(
+            1, sck=Pin(sck_gpio), mosi=Pin(mosi_gpio), miso=Pin(miso_gpio)
+        )
+        self.cs = Pin(cs_gpio, Pin.OUT)
+        self.sd = SDCard(self.spi, self.cs)
+        self.auto_mount = auto_mount
+        self.is_mounted = self.mount() if auto_mount else False
 
     def os_error(self, err: OSError) -> str:
         """Return a human-readable error message based on the OSError code."""
