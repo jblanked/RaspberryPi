@@ -101,12 +101,13 @@ class WeatherLCD:
                     return False
 
                 self.weather = new_weather
-
+                self.update_time()
                 self.weather_interval = ticks_ms() + (60000 * 1)  # 1 minute
 
                 # Write to LCD
                 if len(self.weather) <= 7:
                     temperature = self.weather.split()[0]
+                    self.get_time() # update self.last_time
                     data = {"temperature": temperature, "time": self.last_time}
                     headers = {
                         "User-Agent": "micropython-urequests/1.1",
@@ -114,7 +115,7 @@ class WeatherLCD:
                     }
                     try:
                         res = self.http.post(
-                            url="http://10.0.0.25/weather",
+                            url="http://10.0.0.22/weather",
                             payload=data,
                             headers=headers,
                             timeout=3,
@@ -335,7 +336,8 @@ class WeatherLCD:
         self.lcd.write(f"Temp: {self.weather}", True, 0, 0)
         self.lcd.write(f"Time: {self.get_time(False, True)}", False, 0, 1)
 
-
+weather = None
+    
 try:
     weather = WeatherLCD("your_ssid", "your_pass")
     weather.start()
@@ -351,11 +353,14 @@ try:
             weather.http.disconnectFromWiFi()
             break
 except KeyboardInterrupt:
-    weather.http.disconnectFromWiFi()
-    weather.lcd.clear()
-    weather.led.off()
+    if weather:
+        weather.http.disconnectFromWiFi()
+        weather.lcd.clear()
+        weather.led.off()
 except Exception as e:
-    weather.lcd.write("Error occured", True, 0, 0)
+    if weather:
+        weather.lcd.write("Error occured", True, 0, 0)
     print(f"Error occured: {e}")
     sleep(2)
     machine.reset()
+
