@@ -88,16 +88,21 @@ class WeatherServer:
 
         filename = "weather.json"
         data = self.read_from_file(filename)
-        weather_entries = data.get("weather", [])
+        # Validate data and get weather entries
+        weather_entries = data.get("weather") if isinstance(data, dict) else None
+        if not isinstance(weather_entries, list):
+            weather_entries = (
+                []
+            )  # Default to empty list if data is malformed or missing
 
         # Generate HTML table rows
         table_rows = ""
-        for entry in weather_entries:
+        for entry in reversed(weather_entries):  # Safely reverse and iterate
             temperature = entry.get("temperature", "N/A")
             time_entry = entry.get("time", "N/A")
             table_rows += f"""
                 <tr>
-                    <td>{temperature}°C</td>
+                    <td>{temperature}°F</td>
                     <td>{time_entry}</td>
                 </tr>
             """
@@ -202,7 +207,7 @@ class WeatherServer:
         """
         return weather_html
 
-    def handle_post_weather(self, data, max_values: int = 50):
+    def handle_post_weather(self, data, max_values: int = 1440):
         """
         Handler for POST /weather.
         Receives weather data and stores it.
@@ -272,7 +277,7 @@ class WeatherServer:
 
             # Ensure only the most recent `max_values` entries are kept
             if len(weather_array) > max_values:
-                # Remove the oldest entries (from the beginning of the list)
+                # Remove the oldest entries
                 weather_array = weather_array[-max_values:]
 
             # Update the existing data
