@@ -8,6 +8,7 @@ import json
 import network
 from EasyServer import EasyServer
 from EasySD import EasySD
+import gc
 
 
 class WeatherServer:
@@ -31,6 +32,8 @@ class WeatherServer:
         :param filename: Name of the file.
         :return: True if successful, False otherwise.
         """
+        gc.collect()
+        gc.mem_free()
         if data is None:
             print("Cannot write NULL data")
             return False
@@ -52,6 +55,8 @@ class WeatherServer:
         :param filename: Name of the file.
         :return: Dictionary containing the file data.
         """
+        gc.collect()
+        gc.mem_free()
         try:
             if not self.sd:
                 with open(filename, "r") as f:
@@ -85,9 +90,11 @@ class WeatherServer:
         """
         # Log the GET /weather access
         self.handle_logs("GET /weather accessed.")
-
-        filename = "weather.json"
-        data = self.read_from_file(filename)
+        try:
+            filename = "weather.json"
+            data = self.read_from_file(filename)
+        except Exception as e:
+            data = {"weather": []}
         # Validate data and get weather entries
         weather_entries = data.get("weather") if isinstance(data, dict) else None
         if not isinstance(weather_entries, list):
@@ -207,7 +214,7 @@ class WeatherServer:
         """
         return weather_html
 
-    def handle_post_weather(self, data, max_values: int = 1440):
+    def handle_post_weather(self, data, max_values: int = 360):
         """
         Handler for POST /weather.
         Receives weather data and stores it.
@@ -319,8 +326,8 @@ class WeatherServer:
                     </html>
                 """
                 return success_html
-            else:
-                return "<h1>500 Internal Server Error</h1><p>Failed to write data.</p>"
+
+            return "<h1>500 Internal Server Error</h1><p>Failed to write data.</p>"
 
         except Exception as e:
             print(f"Error handling POST data: {e}")
@@ -527,16 +534,23 @@ class WeatherServer:
         try:
             self.server.run()
         except KeyboardInterrupt:
-            self.server.close()
+            print("KeyboardInterrupt")
         except OSError as e:
             print(e)
-            self.server.close()
         except Exception as e:
             print(e)
+        finally:
             self.server.close()
+            if self.server.led:
+                self.server.led.off()
 
 
 # Run the WeatherServer
+ws = None
 if __name__ == "__main__":
-    ws = WeatherServer("your_ssid", "your_password")
-    ws.run()
+    try:
+        ws = WeatherServer("your_ssid", "your_password")
+        ws.run()
+    finally:
+        if ws and ws.server.led:
+            ws.server.led.off()
