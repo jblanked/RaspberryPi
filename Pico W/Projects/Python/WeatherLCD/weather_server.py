@@ -50,33 +50,46 @@ class WeatherServer:
 
     def read_from_file(self, filename) -> dict:
         """
-        Read a JSON file and return its content as a dictionary.
+        Read a JSON file and process the 'weather' array incrementally.
 
         :param filename: Name of the file.
-        :return: Dictionary containing the file data.
+        :return: Dictionary containing the 'weather' key with parsed data.
         """
         gc.collect()
-        gc.mem_free()
+        data = {"weather": []}
+
         try:
             if not self.sd:
                 with open(filename, "r") as f:
-                    content = f.read()
+                    # Start reading the file
+                    json_obj = json.loads(f.read())
+                    # Ensure 'weather' exists and is a list
+                    if "weather" in json_obj and isinstance(json_obj["weather"], list):
+                        for entry in json_obj["weather"]:
+                            # Process each weather entry
+                            data["weather"].append(entry)
+                            # Free memory regularly
+                            gc.collect()
+                    else:
+                        print(f"No valid 'weather' array found in {filename}.")
             else:
+                # Handle self.sd.read() similarly
                 content = self.sd.read(filename)
-            if content and len(content) > 1:  # Corrected condition
-                try:
-                    data = json.loads(content)
-                    return data
-                except json.JSONDecodeError as jde:
-                    print(f"JSON decoding error in '{filename}': {jde}")
-                    return {"weather": []}
+                json_obj = json.loads(content)
+                if "weather" in json_obj and isinstance(json_obj["weather"], list):
+                    for entry in json_obj["weather"]:
+                        data["weather"].append(entry)
+                        gc.collect()
+            return data
+        except json.JSONDecodeError as jde:
+            print(f"JSON decoding error in '{filename}': {jde}")
             return {"weather": []}
         except OSError as e:
-            if len(e.args) > 0 and e.args[0] == 2:  # ENOENT: No such file or directory
-                # File does not exist; return an empty weather list
+            if e.args[0] == 2:  # ENOENT: File not found
+                print(f"File '{filename}' not found.")
                 return {"weather": []}
             else:
-                print(f"Error reading file '{filename}': {e}")
+                print(f"OSError while reading file '{filename}': {e}")
                 return {"weather": []}
         except Exception as e:
             print(f"Unexpected error reading file '{filename}': {e}")
@@ -549,7 +562,7 @@ class WeatherServer:
 ws = None
 if __name__ == "__main__":
     try:
-        ws = WeatherServer("your_ssid", "your_password")
+        ws = WeatherServer("your_ssid", "your_pass")
         ws.run()
     finally:
         if ws and ws.server.led:
