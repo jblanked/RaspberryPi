@@ -451,3 +451,9 @@ class ILI9341:
             self.display.scroll(distance)
         else:
             self.display.scroll(-distance)
+
+    def reset(self):
+        self.display.reset()
+
+    def erase(self):
+        self.display.erase()
