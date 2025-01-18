@@ -66,8 +66,6 @@ class ILI9341:
         self,
         text: str,
         font=Font.AdafruitGFX5x7Font,
-        foreground=color565(255, 255, 255),
-        background=color565(150, 150, 150),
         clear: bool = False,
     ):
         if clear:
@@ -80,8 +78,15 @@ class ILI9341:
             self.display.set_font(CMSansSerif201224)
         elif font == Font.CMSansSerif201231:
             self.display.set_font(CMSansSerif201231)
-        self.display.set_color(foreground, background)
         self.display.print(f"{text}\n")
+
+    def set_color(
+        self,
+        foreground=color565(255, 255, 255),
+        background=color565(150, 150, 150),
+    ):
+        """Set the color for the display"""
+        self.display.set_color(foreground, background)
 
     def draw_circle(self, xpos0, ypos0, rad, col=color565(255, 255, 255)):
         """
