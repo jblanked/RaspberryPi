@@ -1,5 +1,5 @@
 import _thread
-import sys
+from time import sleep
 
 
 class EasyThread:
@@ -20,21 +20,24 @@ class EasyThread:
 
     def run(self):
         try:
-            # Run the target function and periodically check if it should stop
-            if not self.should_stop:
+            # Keep calling target until a stop is signaled
+            while not self.should_stop:
                 self.target(*self.args, **self.kwargs)
+                # sleep a bit to avoid hogging CPU if target returns quickly:
+                sleep(0.01)
         except Exception as e:
             print(f"Thread encountered an error: {e}")
         finally:
             self.thread = None  # Mark thread as finished
-            sys.exit()  # Exit the system thread
+            _thread.exit()
 
     def end(self):
         self.should_stop = True  # Signal the thread to stop
 
     def join(self):
+        # Busy-wait until the thread is finished.
         while self.is_alive():
-            pass
+            sleep(0.01)
 
     def is_alive(self):
         return self.thread is not None
