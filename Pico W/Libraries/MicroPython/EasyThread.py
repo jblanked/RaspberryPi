@@ -3,6 +3,9 @@ from time import sleep
 
 
 class EasyThread:
+    # Class-level dummy thread to clear stale state from previous soft reboots.
+    _dummy = _thread.start_new_thread(lambda: None, ())
+
     def __init__(self, target, args=(), kwargs=None, lock_thread=False):
         if kwargs is None:
             kwargs = {}
@@ -20,19 +23,19 @@ class EasyThread:
 
     def run(self):
         try:
-            # Keep calling target until a stop is signaled
+            # Keep calling the target until a stop is signaled.
             while not self.should_stop:
                 self.target(*self.args, **self.kwargs)
-                # sleep a bit to avoid hogging CPU if target returns quickly:
+                # Sleep a bit to avoid hogging CPU if target returns quickly.
                 sleep(0.01)
         except Exception as e:
             print(f"Thread encountered an error: {e}")
         finally:
-            self.thread = None  # Mark thread as finished
+            self.thread = None  # Mark thread as finished.
             _thread.exit()
 
     def end(self):
-        self.should_stop = True  # Signal the thread to stop
+        self.should_stop = True  # Signal the thread to stop.
 
     def join(self):
         # Busy-wait until the thread is finished.
@@ -54,5 +57,9 @@ class EasyThread:
     def __exit__(self, exc_type, exc_value, traceback):
         self.end()
         self.join()
+        # Insert a small delay to allow thread cleanup.
+        sleep(0.1)
+        # Start a dummy thread at exit to help refresh the scheduler state.
+        _thread.start_new_thread(lambda: None, ())
         if self.lock_thread:
             self.lock_alloc.release()
