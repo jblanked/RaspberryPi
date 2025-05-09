@@ -3,7 +3,10 @@ import gc
 import displayio
 import framebufferio
 import adafruit_framebuf as framebuf  # https://circuitpython.org/libraries - add to the /lib folder
-from Vector import Vector
+
+from Vector import (
+    Vector,
+)  # https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/CircuitPython/Vector.py - add to the /lib folder
 
 SEEK_CUR = 1
 
@@ -29,19 +32,19 @@ class Image:
             print(e)
             return False
 
-    def from_byte_array(self, data, width, height) -> bool:
+    def from_byte_array(self, data: bytearray, size: Vector) -> bool:
         """
         Create an image from a raw RGB565 byte array.
 
         data: bytes or bytearray length == width*height*2
         """
-        expected = width * height * 2
+        expected = size.x * size.y * 2
         if len(data) != expected:
             raise ValueError(
-                f"Data length {len(data)} != expected {expected} for {width}×{height}"
+                f"Data length {len(data)} != expected {expected} for {size.x}×{size.y}"
             )
 
-        self.size = Vector(width, height)
+        self.size = Vector(size.x, size.y)
 
         # ensure little‑endian
         buf = bytearray(data)
@@ -52,7 +55,7 @@ class Image:
 
         self._raw = buf
         self.buffer = framebuf.FrameBuffer(
-            buf, width, height, framebuf.RGB565
+            buf, size.x, size.y, framebuf.RGB565
         )  # :contentReference[oaicite:0]{index=0}
         return True
 

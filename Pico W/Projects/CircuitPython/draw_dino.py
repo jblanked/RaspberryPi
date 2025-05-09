@@ -17,7 +17,7 @@ dino: bytearray = bytearray(
 print(gc.mem_free())
 
 img = Image()
-img.from_byte_array(dino, 20, 22)
+img.from_byte_array(dino, Vector(20, 22))
 print(gc.mem_free())
 gc.collect()
 
