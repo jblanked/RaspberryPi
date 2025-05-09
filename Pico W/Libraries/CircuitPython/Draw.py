@@ -34,7 +34,6 @@ class Draw:
         gc.collect()
         displayio.release_displays()
 
-        self.board = board_type
         self.size = Vector(board_type.width, board_type.height)
 
         self.frame_buffer = None
@@ -54,7 +53,7 @@ class Draw:
         self.group.append(self.bg_group)
         self.group.append(self.text_group)
 
-        if self.board.board_type == BOARD_TYPE_VGM:
+        if board_type.board_type == BOARD_TYPE_VGM:
             try:
                 self.frame_buffer = picodvi.Framebuffer(
                     320,
@@ -97,13 +96,6 @@ class Draw:
                     "Failed to initialize display. Is the Video Game Module connected?"
                 ) from e
 
-    def deinit(self):
-        """Deinitialize the display and free up resources."""
-        if self.frame_buffer:
-            self.frame_buffer.deinit()
-        displayio.release_displays()
-        gc.collect()
-
     def _color_to_palette_index(self, color: int) -> int:
         """Map a color to the nearest palette index."""
         if not self.is_ready:
@@ -144,22 +136,6 @@ class Draw:
             else:
                 self.display.fill(1)
 
-    def fill(self, color: int):
-        """Fill the display with a color."""
-        if not self.is_ready:
-            raise RuntimeError("Display not initialized.")
-        pidx = self._color_to_palette_index(color)
-        self.display.fill(pidx)
-        self.title_grid.bitmap = self.solid[pidx]
-
-    def clear(self, color: int = TFT_BLACK):
-        """Clear the display with a color."""
-        if not self.is_ready:
-            raise RuntimeError("Display not initialized.")
-        self.text_group = displayio.Group()
-        self.group[1] = self.text_group
-        self.fill(color)
-
     def char(self, position: Vector, ch: str, color: int):
         """Print a character at the specified position."""
         if not self.is_ready:
@@ -169,23 +145,40 @@ class Draw:
         )
         self.text_group.append(glyph)
 
-    def image(self, position: Vector, image: Image):
-        """Draw an Image object into the bitmap."""
+    def clear(self, position: Vector, size: Vector, color: int = TFT_BLACK):
+        """Clear a rectangular area with a color."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
 
+        pidx = self._color_to_palette_index(color)
         self._ensure_draw_bitmap()
 
-        buf = image.buffer
-        width, height = image.size.x, image.size.y
+        if (position.x, position.y) == (0, 0) and (size.x, size.y) == (
+            self.size.x,
+            self.size.y,
+        ):
+            self.display.fill(pidx)
+            return
 
-        for row in range(height):
-            for col in range(width):
-                raw_color = buf.pixel(col, row)
-                pidx = self._color_to_palette_index(raw_color)
-                self.display[position.x + col, position.y + row] = pidx
+        for y in range(position.y, position.y + size.y):
+            for x in range(position.x, position.x + size.x):
+                if 0 <= x < self.size.x and 0 <= y < self.size.y:
+                    self.display[x, y] = pidx
 
-        self.display.dirty()
+    def deinit(self):
+        """Deinitialize the display and free up resources."""
+        if self.frame_buffer:
+            self.frame_buffer.deinit()
+        displayio.release_displays()
+        gc.collect()
+
+    def fill(self, color: int):
+        """Fill the display with a color."""
+        if not self.is_ready:
+            raise RuntimeError("Display not initialized.")
+        pidx = self._color_to_palette_index(color)
+        self.display.fill(pidx)
+        self.title_grid.bitmap = self.solid[pidx]
 
     def image_bitmap(self, position: Vector, bitmap: displayio.Bitmap):
         """Print a bitmap at the specified position."""
@@ -267,6 +260,17 @@ class Draw:
             color,
         )
 
+    def rect_fill(self, position: Vector, size: Vector, color: int):
+        """Fill a rectangle with a color."""
+        if not self.is_ready:
+            raise RuntimeError("Display not initialized.")
+        pidx = self._color_to_palette_index(color)
+        self._ensure_draw_bitmap()
+        for y in range(position.y, position.y + size.y):
+            for x in range(position.x, position.x + size.x):
+                if 0 <= x < self.size.x and 0 <= y < self.size.y:
+                    self.display[x, y] = pidx
+
     def set_palette(self, index: int, color: int):
         """Set the color of a palette index."""
         if not self.is_ready:
@@ -274,6 +278,32 @@ class Draw:
         if index < 0 or index >= self.palette_count:
             raise ValueError(f"Palette index {index} out of range")
         self.palette[index] = color
+
+    def swap(self):
+        """
+        Swaps the display buffers to show the next frame.
+
+        This method efficiently updates the display by making the current working buffer
+        visible and providing a fresh buffer for drawing the next frame.
+        """
+        if not self.is_ready:
+            raise RuntimeError("Display not initialized.")
+
+        # Create a temporary reference to preserve current content
+        temp_display = self.display
+
+        # Switch the current bitmap to be displayed
+        self.bg_group.remove(self.title_grid)
+        new_grid = displayio.TileGrid(temp_display, pixel_shader=self.palette)
+        self.bg_group.append(new_grid)
+        self.title_grid = new_grid
+
+        # Create a new bitmap for the next frame
+        self.display = displayio.Bitmap(self.size.x, self.size.y, self.palette_count)
+        self.display.fill(0)  # Fill with background color index
+
+        # Refresh/update display and free memory
+        gc.collect()
 
     def text(self, position: Vector, txt: str, color: int):
         """Print a string at the specified position."""
