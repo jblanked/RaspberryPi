@@ -3,10 +3,23 @@ import gc
 print(gc.mem_free())
 gc.collect()
 
-from Image import Image
-from Draw import Draw, TFT_WHITE, TFT_BLACK
-from Board import VGM_BOARD_CONFIG
-from Vector import Vector
+from Image import (
+    Image,
+)  # https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/CircuitPython/Image.py - add to the /lib folder
+
+from Draw import (
+    Draw,
+    TFT_WHITE,
+    TFT_BLACK,
+)  # https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/CircuitPython/Draw.py - add to the /lib folder
+
+from Board import (
+    VGM_BOARD_CONFIG,
+)  # https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/CircuitPython/Board.py - add to the /lib folder
+
+from Vector import (
+    Vector,
+)  # https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/CircuitPython/Vector.py - add to the /lib folder
 
 print(gc.mem_free())
 
