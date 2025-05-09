@@ -2,22 +2,40 @@ import gc
 import terminalio
 import board, displayio, picodvi, framebufferio
 
-from adafruit_display_text import label
-from Board import Board, BOARD_TYPE_VGM
-from Image import Image
+from adafruit_display_text import (
+    label,
+)  # https://circuitpython.org/libraries - add to the /lib folder
+
+from Board import (
+    Board,
+    BOARD_TYPE_VGM,
+    BOARD_TYPE_PICO_CALC,
+    BOARD_TYPE_JBLANKED,
+)  # https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/CircuitPython/Board.py - add to the /lib folder
+
+from Image import (
+    Image,
+)  # https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/CircuitPython/Image.py - add to the /lib folder
+
+from Vector import (
+    Vector,
+)  # https://github.com/jblanked/RaspberryPi/blob/main/Pico%20W/Libraries/CircuitPython/Vector.py - add to the /lib folder
+
 
 TFT_WHITE = 0xFFFFFF
 TFT_BLACK = 0x000000
 
 
 class Draw:
-    def __init__(self, board_type: Board):
+    """A class to handle drawing on a display using the CircuitPython displayio library."""
+
+    def __init__(self, board_type: Board, palette_count: int = 2):
+        """Initialize the display with the specified board type."""
         gc.collect()
         displayio.release_displays()
 
         self.board = board_type
-        self.width = board_type.width
-        self.height = board_type.height
+        self.size = Vector(board_type.width, board_type.height)
 
         self.frame_buffer = None
         self.display = None
@@ -26,7 +44,7 @@ class Draw:
         self.palette = displayio.Palette(2)
         self.palette[0] = TFT_BLACK
         self.palette[1] = TFT_WHITE
-        self.palette_count = 2
+        self.palette_count = palette_count
 
         self.is_ready = False
 
@@ -56,11 +74,11 @@ class Draw:
                 )
 
                 self.display = displayio.Bitmap(
-                    self.width, self.height, self.palette_count
+                    self.size.x, self.size.y, self.palette_count
                 )
                 self.solid = []
                 for idx in range(self.palette_count):
-                    bmp = displayio.Bitmap(self.width, self.height, self.palette_count)
+                    bmp = displayio.Bitmap(self.size.x, self.size.y, self.palette_count)
                     bmp.fill(idx)
                     self.solid.append(bmp)
 
@@ -72,18 +90,22 @@ class Draw:
                 fb_display.root_group = self.group
                 self.is_ready = True
 
+                gc.collect()
+
             except Exception as e:
                 raise RuntimeError(
                     "Failed to initialize display. Is the Video Game Module connected?"
                 ) from e
 
     def deinit(self):
+        """Deinitialize the display and free up resources."""
         if self.frame_buffer:
             self.frame_buffer.deinit()
         displayio.release_displays()
         gc.collect()
 
     def _color_to_palette_index(self, color: int) -> int:
+        """Map a color to the nearest palette index."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
         if 0 <= color < self.palette_count:
@@ -114,6 +136,7 @@ class Draw:
         return best_i
 
     def _ensure_draw_bitmap(self):
+        '''Ensure the display bitmap is set correctly."""'''
         if self.title_grid.bitmap is not self.display:
             self.title_grid.bitmap = self.display
             if self.title_grid.bitmap is self.solid[0]:
@@ -122,6 +145,7 @@ class Draw:
                 self.display.fill(1)
 
     def fill(self, color: int):
+        """Fill the display with a color."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
         pidx = self._color_to_palette_index(color)
@@ -129,19 +153,23 @@ class Draw:
         self.title_grid.bitmap = self.solid[pidx]
 
     def clear(self, color: int = TFT_BLACK):
+        """Clear the display with a color."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
         self.text_group = displayio.Group()
         self.group[1] = self.text_group
         self.fill(color)
 
-    def char(self, x: int, y: int, ch: str, color: int):
+    def char(self, position: Vector, ch: str, color: int):
+        """Print a character at the specified position."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
-        glyph = label.Label(terminalio.FONT, text=ch, color=color, x=x, y=y)
+        glyph = label.Label(
+            terminalio.FONT, text=ch, color=color, x=position.x, y=position.y
+        )
         self.text_group.append(glyph)
 
-    def image(self, x: int, y: int, image: Image):
+    def image(self, position: Vector, image: Image):
         """Draw an Image object into the bitmap."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
@@ -155,17 +183,21 @@ class Draw:
             for col in range(width):
                 raw_color = buf.pixel(col, row)
                 pidx = self._color_to_palette_index(raw_color)
-                self.display[x + col, y + row] = pidx
+                self.display[position.x + col, position.y + row] = pidx
 
         self.display.dirty()
 
-    def image_bitmap(self, x: int, y: int, bitmap: displayio.Bitmap):
+    def image_bitmap(self, position: Vector, bitmap: displayio.Bitmap):
+        """Print a bitmap at the specified position."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
-        tile_grid = displayio.TileGrid(bitmap, pixel_shader=self.palette, x=x, y=y)
+        tile_grid = displayio.TileGrid(
+            bitmap, pixel_shader=self.palette, x=position.x, y=position.y
+        )
         self.text_group.append(tile_grid)
 
-    def image_bytearray(self, x: int, y: int, byte_array: bytearray, img_width: int):
+    def image_bytearray(self, position: Vector, byte_array: bytearray, img_width: int):
+        """Draw a byte array into the bitmap."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
         # derive height from length
@@ -176,17 +208,20 @@ class Draw:
                 idx = row * img_width + col
                 color = (byte_array[2 * idx] << 8) | byte_array[2 * idx + 1]
                 pidx = self._color_to_palette_index(color)
-                self.pixel(x + col, y + row, pidx)
+                self.pixel(Vector(position.x + col, position.y + row), pidx)
 
-    def line(self, x1: int, y1: int, x2: int, y2: int, color: int):
+    def line(self, position: Vector, size: Vector, color: int):
+        """Draw a line from (x1, y1) to (x2, y2) with the specified color."""
         self._ensure_draw_bitmap()
+        x1, y1 = position.x, position.y
+        x2, y2 = size.x, size.y
         dx = abs(x2 - x1)
         dy = abs(y2 - y1)
         sx = 1 if x1 < x2 else -1
         sy = 1 if y1 < y2 else -1
         err = dx - dy
         while True:
-            self.pixel(x1, y1, color)
+            self.pixel(Vector(x1, y1), color)
             if x1 == x2 and y1 == y2:
                 break
             e2 = err * 2
@@ -197,31 +232,54 @@ class Draw:
                 err += dx
                 y1 += sy
 
-    def pixel(self, x: int, y: int, color: int):
+    def pixel(self, position: Vector, color: int):
+        """Set the pixel at (x, y) to the specified color."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
-        if x < 0 or x >= self.width or y < 0 or y >= self.height:
+        if (
+            position.x < 0
+            or position.x >= self.size.x
+            or position.y < 0
+            or position.y >= self.size.y
+        ):
             return
         pidx = self._color_to_palette_index(color)
         self._ensure_draw_bitmap()
-        self.display[x, y] = pidx
+        self.display[position.x, position.y] = pidx
 
-    def rect(self, x: int, y: int, w: int, h: int, color: int):
+    def rect(self, position: Vector, size: Vector, color: int):
+        """Draw a rectangle at (x, y) with width w and height h."""
         self._ensure_draw_bitmap()
-        self.line(x, y, x + w - 1, y, color)
-        self.line(x + w - 1, y, x + w - 1, y + h - 1, color)
-        self.line(x + w - 1, y + h - 1, x, y + h - 1, color)
-        self.line(x, y + h - 1, x, y, color)
+        self.line(position, Vector(position.x + size.x - 1, position.y), color)
+        self.line(
+            Vector(position.x + size.x - 1, position.y),
+            Vector(position.x + size.x - 1, position.y + size.y - 1),
+            color,
+        )
+        self.line(
+            Vector(position.x + size.x - 1, position.y + size.y - 1),
+            Vector(position.x, position.y + size.y - 1),
+            color,
+        )
+        self.line(
+            Vector(position.x, position.y + size.y - 1),
+            Vector(position.x, position.y),
+            color,
+        )
 
     def set_palette(self, index: int, color: int):
+        """Set the color of a palette index."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
         if index < 0 or index >= self.palette_count:
             raise ValueError(f"Palette index {index} out of range")
         self.palette[index] = color
 
-    def text(self, x: int, y: int, txt: str, color: int):
+    def text(self, position: Vector, txt: str, color: int):
+        """Print a string at the specified position."""
         if not self.is_ready:
             raise RuntimeError("Display not initialized.")
-        t = label.Label(terminalio.FONT, text=txt, color=color, x=x, y=y)
+        t = label.Label(
+            terminalio.FONT, text=txt, color=color, x=position.x, y=position.y
+        )
         self.text_group.append(t)
