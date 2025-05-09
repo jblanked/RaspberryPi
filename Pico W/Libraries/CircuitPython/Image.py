@@ -1,7 +1,5 @@
-import array
 import sys
 import gc
-import board
 import displayio
 import framebufferio
 import adafruit_framebuf as framebuf  # https://circuitpython.org/libraries - add to the /lib folder
