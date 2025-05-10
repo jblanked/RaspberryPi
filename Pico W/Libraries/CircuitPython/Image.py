@@ -1,8 +1,11 @@
 import sys
-import gc
-import displayio
-import framebufferio
-import adafruit_framebuf as framebuf  # https://circuitpython.org/libraries - add to the /lib folder
+from gc import collect as free
+from displayio import release_displays
+from framebufferio import FramebufferDisplay
+from adafruit_framebuf import (
+    FrameBuffer,
+    RGB565,
+)  # https://circuitpython.org/libraries - add to the /lib folder
 
 from Vector import (
     Vector,
@@ -51,11 +54,11 @@ class Image:
         if sys.byteorder != "little":
             for i in range(0, len(buf), 2):
                 buf[i], buf[i + 1] = buf[i + 1], buf[i]
-            gc.collect()
+            free()
 
         self._raw = buf
-        self.buffer = framebuf.FrameBuffer(
-            buf, size.x, size.y, framebuf.RGB565
+        self.buffer = FrameBuffer(
+            buf, size.x, size.y, RGB565
         )  # :contentReference[oaicite:0]{index=0}
         return True
 
@@ -90,8 +93,8 @@ class Image:
     def _make_framebuffer(self):
         """Wrap self._raw in a FrameBuffer for drawing operations."""
         w, h = self.size.x, self.size.y
-        self.buffer = framebuf.FrameBuffer(
-            self._raw, w, h, framebuf.RGB565
+        self.buffer = FrameBuffer(
+            self._raw, w, h, RGB565
         )  # :contentReference[oaicite:1]{index=1}
 
     def from_string(self, image_str: str):
@@ -133,8 +136,8 @@ class Image:
                 raw[idx + 1] = v >> 8
 
         self._raw = raw
-        self.buffer = framebuf.FrameBuffer(
-            raw, w, h, framebuf.RGB565
+        self.buffer = FrameBuffer(
+            raw, w, h, RGB565
         )  # :contentReference[oaicite:2]{index=2}
 
     def show_on(self, fb_native):
@@ -147,6 +150,6 @@ class Image:
             for x in range(self.size.x):
                 fb_native.pixel(x, y, self.buffer.pixel(x, y))
 
-        displayio.release_displays()  # :contentReference[oaicite:3]{index=3}
-        disp = framebufferio.FramebufferDisplay(fb_native, auto_refresh=True)
+        release_displays()  # :contentReference[oaicite:3]{index=3}
+        disp = FramebufferDisplay(fb_native, auto_refresh=True)
         return disp
