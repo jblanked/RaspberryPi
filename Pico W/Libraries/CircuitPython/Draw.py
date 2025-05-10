@@ -1,6 +1,8 @@
 import gc
-import terminalio
-import board, displayio, picodvi, framebufferio
+from terminalio import FONT
+from picodvi import Framebuffer
+from framebufferio import FramebufferDisplay
+import board, displayio
 
 from adafruit_display_text.bitmap_label import (
     Label,
@@ -70,7 +72,7 @@ class Draw:
         if board_type.board_type == BOARD_TYPE_VGM:
             try:
                 # Initialize the frame buffer
-                self.frame_buffer = picodvi.Framebuffer(
+                self.frame_buffer = Framebuffer(
                     320,
                     240,
                     clk_dp=board.GP9,
@@ -83,7 +85,7 @@ class Draw:
                     blue_dn=board.GP10,
                     color_depth=8,
                 )
-                self.fb_display = framebufferio.FramebufferDisplay(
+                self.fb_display = FramebufferDisplay(
                     self.frame_buffer, auto_refresh=auto_swap
                 )
 
@@ -403,7 +405,7 @@ class Draw:
         else:
             # Create new text object only if needed
             text_obj = Label(
-                terminalio.FONT,
+                FONT,
                 text=txt,
                 color=color,
                 x=int(position.x),
