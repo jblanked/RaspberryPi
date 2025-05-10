@@ -1,4 +1,4 @@
-import gc
+from gc import collect as free
 from terminalio import FONT
 from picodvi import Framebuffer
 from framebufferio import FramebufferDisplay
@@ -44,7 +44,7 @@ class Draw:
 
         # Free up any existing displays and force garbage collection
         displayio.release_displays()
-        gc.collect()
+        free()
 
         self.board = board_type
         self.size = Vector(board_type.width, board_type.height)
@@ -109,7 +109,7 @@ class Draw:
                 self.is_ready = True
 
                 # Force garbage collection to reclaim memory
-                gc.collect()
+                free()
 
             except Exception as e:
                 raise RuntimeError(
@@ -209,7 +209,7 @@ class Draw:
             self.text_group.pop()
 
         # Force garbage collection
-        gc.collect()
+        free()
 
     def deinit(self):
         """Deinitialize the display and free up resources."""
@@ -226,7 +226,7 @@ class Draw:
             self.frame_buffer = None
 
         displayio.release_displays()
-        gc.collect()
+        free()
 
     def fill(self, color: int):
         """Fill the display with a color, optimized for memory usage."""
@@ -244,8 +244,25 @@ class Draw:
         last_text = self.text_group[-1]
         return Vector(last_text.x + last_text.width, last_text.y)
 
+    def image(self, position: Vector, img: Image):
+        """Draw an image at the specified position."""
+        if not self.is_ready:
+            return
+
+        self.image_bytearray(position, img._raw, img.size.x)
+
     def image_bitmap(self, position: Vector, bitmap: displayio.Bitmap):
         """Print a bitmap at the specified position."""
+        if not self.is_ready:
+            return
+
+        tile_grid = displayio.TileGrid(
+            bitmap, pixel_shader=self.palette, x=int(position.x), y=int(position.y)
+        )
+        self.text_group.append(tile_grid)
+
+    def image_bitmap_on_disk(self, position: Vector, bitmap: displayio.OnDiskBitmap):
+        """Draw a bitmap at the specified position (slow load from the SD)."""
         if not self.is_ready:
             return
 
@@ -419,7 +436,7 @@ class Draw:
             self.text_group.append(text_obj)
 
             # Force garbage collection after creating a new object
-            gc.collect()
+            free()
 
         # Increment index for next use
         self.current_text_index += 1
